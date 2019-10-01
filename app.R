@@ -192,7 +192,7 @@ server <- function(input, output) {
       ) %>% 
       addCircleMarkers(lat = values$df$lat ,
                        lng = values$df$lng ,
-                       color = "#560A86" , #"#FCF340" ,
+                       color = "#F5D300" , #"#FCF340" ,
                        stroke = T ,
                        radius = 2 ,
                        opacity = .5 ,
