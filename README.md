@@ -9,4 +9,4 @@ This is a shiny application designed to go with the rfishbase and robis packages
   4) Add more, relevant, information for each fish
   5) Limit redundancys in code to speed up app
 
-Please feel free to reach out with any suggestions/additions.
+To run the app locally, you need to download the app.R, helpers.R, background-data.RDS, report.Rmd, and the www folder. Please feel free to reach out with any suggestions/additions.
