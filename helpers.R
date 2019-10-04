@@ -1,11 +1,5 @@
 # Helpers.R
 
-## GitHub Packages ##
-
-# remotes::install_github("ropensci/rfishbase")
-# devtools::install_github("iobis/robis")
-
-
 ## Helpful Links ##
 
 #https://renkun-ken.github.io/rlist-tutorial/Features/Searching.html
@@ -20,26 +14,21 @@
 #https://obis.org/manual/accessr/
 #https://www.shutterstock.com/blog/neon-color-palettes
 #https://shiny.rstudio.com/articles/selectize.html
-
+#https://rmarkdown.rstudio.com/articles_intro.html
+#https://rstudio.com/wp-content/uploads/2015/03/rmarkdown-reference.pdf
+#https://gist.github.com/yihui/6091942
 
 ## For photos 
 # Can use just thumbnails by pasting PicPreferred to this url "http://www.fishbase.org/images/thumbnails/jpg/tn_"
 # XLM pics here http://www.fishbase.org/webservice/photos/FishPicsList.php?Genus=Salmo&Species=salar&type=
 
 
-
-#Things to do still
+## Things to do still
 # Opening page pop-up
 # Work Cited
-# Footer with references, links
-# Create HTML object for each fish 'card' and make dowloadable
-# When closing card reset div 
-# Add spinners to maps
-# Put occurances on background map -- animate map
-# Add notification to map if no occurances come up
-# Add more information per fish
-# Try to find way to load information faster
-# If user searches an empty string, query species table rather than common name table
+# Stylize PDF downloads -- create conditional chunks
+# Add more, relevant informations information per fish
+# Try to find way to load/download information faster
 # Stylize modal to fit with rest of app
 
 
@@ -76,6 +65,8 @@ margin-top: 10px;
 color: red;
 }
 "
+
+## Busy Indicator Functions - https://github.com/daattali/advanced-shiny/tree/master/busy-indicator
 
 withBusyIndicatorUI <- function(button) {
   id <- button[['attribs']][['id']]
@@ -140,17 +131,27 @@ errorFunc <- function(err, buttonId) {
   shinyjs::show(selector = errEl, anim = TRUE, animType = "fade")
 }
 
-## Species Occurances Placeholder
+# Create df for reactive values in modal map
 species.occurances <- bind_cols("year" = NA ,
                                 "species" = NA , 
                                 "lat" = 0 , 
-                                "lng" = 0)
-
+                                "lng" = 0 ,
+                                "label" = NULL ,
+                                "fillOpacity" = 0 ,
+                                "opacity" = 0)
 
 ## Create Modal Function
-createModal <- function(select.species , species.table) {
+createModal <- function(select.species , species.table ) {
+  
+  if( is.na(species.table$FBname) ) {
+    title <- paste0("<em>" , select.species , "</em>")
+  } else {
+    title <- paste(species.table$FBname , tags$em(select.species) , sep = ", ")
+  }
+  
   modalDialog(
-    title = HTML(paste(species.table$FBname , tags$em(select.species) , sep = ", ")) ,
+    #title = HTML(paste(species.table$FBname , tags$em(select.species) , sep = ", ")) ,
+    title = HTML(title) ,
     size = "m" ,
     fade = F ,
     footer = HTML('<button type="button" id = "close.modal" class="btn btn-default" data-dismiss="modal">Close</button>') ,
@@ -161,14 +162,29 @@ createModal <- function(select.species , species.table) {
     tags$p(tags$strong("Description:") , br() , 
            HTML(rfishbase::morphology(select.species)$AddChars)
     ) ,
-    tags$p(tags$strong("Life Cycle/Mating") , br() , 
+    tags$p(tags$strong("Life Cycle/Mating:") , br() , 
            HTML(rfishbase::reproduction(select.species)$AddInfos)) ,
-    leafletOutput("modal.map")
-    #Classification.Name
-    #Environment
-    #Distribution
-    
-    #Size
-    
+    tags$p(tags$strong("Distribution:") , br() ,
+    leafletOutput("modal.map")) , hr() ,
+    tags$span(style = "text-align:center;" , downloadButton('downloadReport'))
   )
 }
+
+## Background Map Data
+
+x <- 1
+
+df <- read_rds("background-locations.RDS")
+
+colors <- bind_cols(
+  colors = c(
+    "#08F7FE" ,
+    "#F5D300" ,
+    "#FF9472" ,
+    "#FE53BB" ,
+    "#7122FA" ,
+    "#011FFD"
+  ) ,
+  order = c(1:6)
+)
+
