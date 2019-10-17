@@ -166,7 +166,7 @@ createModal <- function(select.species , species.table ) {
            HTML(rfishbase::reproduction(select.species)$AddInfos)) ,
     tags$p(tags$strong("Distribution:") , br() ,
     leafletOutput("modal.map")) , hr() ,
-    tags$span(style = "text-align:center;" , downloadButton('downloadReport'))
+    tags$div(style = "text-align:center;" , downloadButton('downloadReport'))
   )
 }
 
@@ -188,3 +188,53 @@ colors <- bind_cols(
   order = c(1:6)
 )
 
+# Hit enter key to click
+
+jscode <- '
+$(function() {
+var $els = $("[data-proxy-click]");
+$.each(
+$els,
+function(idx, el) {
+var $el = $(el);
+var $proxy = $("#" + $el.data("proxyClick"));
+$el.keydown(function (e) {
+if (e.keyCode == 13) {
+$proxy.click();
+}
+});
+}
+);
+});
+'
+
+## Downloadable Reports Map ##
+
+# Download NASA image
+#download.file("https://eoimages.gsfc.nasa.gov/images/imagerecords/57000/57752/land_shallow_topo_2048.jpg", 
+#              destfile = "earth.jpg", mode = "wb")
+
+# Load picture and render
+#earth <- jpeg::readJPEG("earth.jpg", native = TRUE)
+#earth <- grid::rasterGrob(earth , interpolate = T)
+
+earth <- readRDS("earth.RDS")
+
+bounds <- bind_cols(x = c(-180 , 180) ,
+                    y = c(-90 , 90))
+
+#p <- ggplot() +
+#  annotation_custom(earth, xmin = -180, xmax = 180, ymin = -90, ymax = 90) +
+#  geom_point(data = df %>% filter(order == 1) , aes(x= lng, y= lat), color = "#FFD200", 
+#             alpha= .3, size= 1) + 
+#  geom_point(data = bounds , aes(x = x , y = y) , alpha = 0) +
+#  theme_void() +
+#  theme(
+#    panel.spacing = unit(c(0 , 0 , 0 , 0) , "null") ,
+#    plot.margin = grid::unit(c(0 , 0 , 0 , 0) , "cm")
+#  ) +
+#  xlim(-180 , 180) +
+#  ylim(-90 , 90) +
+#  coord_equal()
+
+#p

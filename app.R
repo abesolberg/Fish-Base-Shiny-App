@@ -8,8 +8,6 @@
 # install.packages("tinytex")
 # install.packages("httr)
 
-# webshot::install_phantomjs() #Need to run this if running on local machine
-
 library(shiny)
 library(shinyjs)
 library(tidyverse)
@@ -19,6 +17,8 @@ library(leaflet)
 library(mapview)
 library(tinytex)
 library(httr)
+library(rmarkdown)
+library(lubridate)
 
 source("helpers.R")
 
@@ -29,7 +29,8 @@ ui <- fluidPage(
   tags$head(tags$style(".modal-body {
                        max-height: calc(100vh - 210px);
                        overflow-y: auto;
-                       }")) ,
+                       }") ,
+            tags$script(HTML(jscode))) ,
   
   div(class = "outer" , 
       leafletOutput("map" , width = "100%" , height = "100%")
@@ -38,10 +39,12 @@ ui <- fluidPage(
   absolutePanel(id = "searchPanel" , class = "panel" , fixed = TRUE, 
                 draggable = F, width = "auto", height = "auto" , 
                 style = "background:rgba(0,0,255,0);text-align:center;border:rgba(0,0,255,0);" ,
-                textInput("search", 
-                          label = span(style ="color:#00ffff;font-size:30px" , "Search Fish:") ,
-                          placeholder = "Search by species name or common name") ,
-                withBusyIndicatorUI(actionButton("search.btn" , label = "Search")) , 
+                tagAppendAttributes(
+                  textInput("search", 
+                            label = span(style ="color:#00ffff;font-size:30px" , "Search Fish:") ,
+                            placeholder = "Search by species name or common name") , 
+                  `data-proxy-click` = "searchButton"),
+                withBusyIndicatorUI(actionButton("searchButton" , label = "Search")) , 
                 uiOutput("search.results.list")
                 
   ) ,
@@ -115,18 +118,32 @@ server <- function(input, output) {
   #Show welcome Modal
   showModal(
     modalDialog(
-      title = "Welcome to the FishBase Shiny application" ,
+      title = "Welcome to the Shiny FishBase Data Portal" ,
       size = "m" ,
       easyClose = TRUE ,
       footer = modalButton("Enter") , 
-      tags$p("Lorem Ipsum")
+      tags$p("Thank you for using the Shiny FishBase Data Portal!" , 
+             br() , br(), 
+             "This app was build off of the", 
+             tags$a(href = "https://www.fishbase.de/home.htm" , "FishBase") ,
+             "database and the" , tags$a(href = "https://github.com/ropensci/rfishbase" , "rfishbase") , 
+             "R package, created by" , tags$a(href = "https://ropensci.org/" , "rOpenSci.") , 
+             "All observation data come from" , tags$a(href = "https://obis.org" , "OBIS") , 
+             "and the" , tags$a(href = "https://github.com/iobis/robis" , "robis") , "package in R." ,
+             br() , br() , 
+             "This application is still in development, and all the code is open source, and available" , 
+             tags$a(href = "https://github.com/abesolberg/Fish-Base-Shiny-App" , "here.") ,
+             "If you have any questions or comments on the application, or would like to propose a suggestion, please feel free to" , 
+             tags$a(href="mailto:charles.solberg@mail.mcgill.ca" , "email me") , "or file a request on" ,
+             tags$a(href = "https://github.com/abesolberg/Fish-Base-Shiny-App" , "GitHub.") ,
+             br() , br() , "Thank you again!" , br() , "-Abe")
     )
   )
   
   #Query
   query <- reactive({
     
-    input$search.btn
+    input$searchButton
     
     q <- isolate(str_to_sentence(input$search))
     
@@ -152,11 +169,11 @@ server <- function(input, output) {
     
   })
   
-  observeEvent(input$search.btn , {
+  observeEvent(input$searchButton , {
     
     withProgress( message = "Searching..." , {
       
-      withBusyIndicatorServer("search.btn" , {
+      withBusyIndicatorServer("searchButton" , {
         
         if (length(unique(query()$Species)) == 1 ){
           
@@ -212,17 +229,17 @@ server <- function(input, output) {
   output$search.results.list <- renderUI({
     
     #Don't render anything until a user clicks the search button
-    input$search.btn
+    input$searchButton
     
-    withBusyIndicatorServer("search.btn" , {
+    withBusyIndicatorServer("searchButton" , {
       
       q <- isolate(rfishbase::validate_names(str_to_sentence(input$search)))
       
       label <- paste("There were" , length(unique(query()$Species)) , "search results. <br> Please select one below.")
       
-      if (input$search.btn == 0 ) {
+      if (input$searchButton == 0 ) {
         # Don't render anything if nothing was clicked
-      } else if (input$search.btn != 0 & !is.na(q) ) {
+      } else if (input$searchButton != 0 & !is.na(q) ) {
         # Don't render anything if the name is validated
       } else if (length(unique(query()$Species)) == 1) {
         # Don't render anything if only one species is returned
@@ -370,8 +387,8 @@ server <- function(input, output) {
         
         # temporarily switch to the temp dir, in case you do not have write
         # permission to the current working directory
-        owd <- setwd(tempdir())
-        on.exit(setwd(owd))
+        #owd <- setwd(tempdir())
+        #on.exit(setwd(owd))
         file.copy(src, 'report.Rmd', overwrite = TRUE)
         
         incProgress(.1)
@@ -409,54 +426,33 @@ server <- function(input, output) {
         # Find Species Occurances
         species.occurances <- robis::occurrence(select.species)
         
-        if (is_empty(species.occurances)) {
-          
-          species.occurances <- bind_cols("year" = NA ,
-                                          "species" = NA , 
-                                          "lat" = 0 , 
-                                          "lng" = 0 ,
-                                          "label" = "No data available" ,
-                                          "fillOpacity" = 0 ,
-                                          "opacity" = 0)
-        } else {
+        if (!is_empty(species.occurances)) {
           
           species.occurances <- species.occurances %>% 
             select(year = date_year ,
                    species = scientificName , 
                    lat = decimalLatitude , 
-                   lng = decimalLongitude) %>% 
-            mutate(label = NULL ,
-                   fillOpacity = .2 ,
-                   opacity = .5)
+                   lng = decimalLongitude) 
           
+          m <- ggplot() +
+            annotation_custom(earth, xmin = -180, xmax = 180, ymin = -90, ymax = 90) +
+            geom_point(data = species.occurances , aes(x= lng, y= lat), color = "#FFD200", 
+                       alpha= .3, size= 1) + 
+            geom_point(data = bounds , aes(x = x , y = y) , alpha = 0) +
+            theme_void() +
+            theme(
+              panel.spacing = unit(c(0 , 0 , 0 , 0) , "null") ,
+              plot.margin = grid::unit(c(0 , 0 , 0 , 0) , "cm")
+            ) +
+            xlim(-180 , 180) +
+            ylim(-90 , 90) +
+            coord_equal()
+          
+        } else {
+          m <- NULL
         }
         
-        incProgress(.6 , detail = "Rendering distribution map")
-        
-        m <- leaflet::leaflet(species.occurances) %>% #Need to change this
-          addProviderTiles(providers$CartoDB.DarkMatter
-          ) %>% 
-          addCircleMarkers(lat = species.occurances$lat ,
-                           lng = species.occurances$lng ,
-                           color = "#F5D300" , 
-                           stroke = T ,
-                           radius = 2 ,
-                           opacity = species.occurances$opacity ,
-                           fillOpacity = species.occurances$fillOpacity ,
-                           label = species.occurances$label ,
-                           labelOptions = labelOptions(
-                             noHide = T , textOnly = T ,
-                             direction = "top" ,
-                             style = list(
-                               'text-align' = 'center' ,
-                               'font-size' = '30px' ,
-                               'color' = "#FFFFFF"
-                             )) ,
-                           group = "species.select"
-          ) 
-        
-        mapview::mapshot(m , file = paste0(getwd() , "/map.png") ,remove_controls = "zoomControl" 
-        )
+        incProgress(.5 , detail = "Compiling PDF")
         
         GET(url = url, 
             write_disk("fish.jpg" , overwrite = T))
@@ -464,7 +460,7 @@ server <- function(input, output) {
         incProgress(.7 , detail = "Compiling PDF")
         
         library(rmarkdown)
-        out <- render('report.Rmd', pdf_document())
+        out <- render('fishbase-printout.Rmd', pdf_document())
         file.rename(out, file)
       })
       
@@ -475,4 +471,3 @@ server <- function(input, output) {
 
 # Run the application 
 shinyApp(ui = ui, server = server ,  options = list(launch.browser = TRUE))
-
